@@ -32,7 +32,7 @@ with st.form("input_form"):
     labor_per_day = st.number_input("Available Laborers per Day", min_value=1)
     hours_per_day = st.number_input("Work Hours per Day", value=8, min_value=1)
 
-    target_duration = st.number_input("🔢 Target Duration to Finish (Days)", min_value=0.0, step=0.1)
+    target_duration = st.number_input("Target Duration to Finish (Days)", min_value=0.0, step=0.1)
 
     submitted = st.form_submit_button("Calculate")
 
@@ -82,10 +82,10 @@ if submitted:
     df = pd.DataFrame(results, columns=["Method", "Labor/Hour", "Labor/Day", "Estimated Duration (Days)"])
     df_req = pd.DataFrame(required_labor_results, columns=["Method", "Required Labor to Finish in Target Duration"])
 
-    st.success(f"📋 Estimation Results for Activity: **{activity_name or 'Unnamed'}**")
-    st.subheader("📈 Duration Estimates")
+    st.success(f"Estimation Results for Activity: **{activity_name or 'Unnamed'}**")
+    st.subheader("Duration Estimates")
     st.dataframe(df, use_container_width=True)
 
     if target_duration > 0:
-        st.subheader(f"🧮 Labor Needed to Finish in {target_duration} Days")
+        st.subheader(f"Labor Needed to Finish in {target_duration} Days")
         st.dataframe(df_req, use_container_width=True)
