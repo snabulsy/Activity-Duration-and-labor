@@ -1,91 +1,67 @@
-from datetime import datetime
-import pandas as pd
 import streamlit as st
 
-# === Streamlit App Setup ===
-st.set_page_config(page_title="PERT-Based Labor Estimation Tool")
+# === Set up page ===
+st.set_page_config(page_title="Labor Duration Estimator", layout="centered")
 
-st.title("🔧 Labor Duration Estimator with PERT & Required Labor")
+# === Calculation Functions ===
+def estimate_duration_by_productivity(prod_per_labor_per_day, labor_count, quantity):
+    daily_output = prod_per_labor_per_day * labor_count
+    duration = quantity / daily_output if daily_output else 0
+    return round(daily_output, 2), round(duration, 2)
+
+def required_labor_for_target(prod_per_labor_per_day, quantity, target_days):
+    if prod_per_labor_per_day == 0 or target_days == 0:
+        return 0
+    required_labor = quantity / (prod_per_labor_per_day * target_days)
+    return round(required_labor, 2)
+
+# === Streamlit UI ===
+st.title("🛠️ Labor Duration Estimation Tool")
 st.markdown("""
-Estimate construction activity durations using both statistical metrics (mean, median, mode, trimmed mean) and PERT methodology.  
-You can also specify a target duration to calculate how much **labor** is needed to finish on time.
+Estimate how many laborers you need or how many days are required to finish a job based on productivity.
+
+Input:
+- Total work quantity
+- Available labor per day
+- Production per labor per day (from statistical measures)
+- Optionally, a target duration
 """)
 
-# === User Input Form ===
-with st.form("input_form"):
-    activity_name = st.text_input("Activity Name", placeholder="e.g., Masonry")
+with st.form("estimation_form"):
+    quantity = st.number_input("📦 Total Quantity of Work (units)", min_value=0.0)
+    labor_available = st.number_input("👷 Available Laborers per Day", min_value=1)
+    work_hours = st.number_input("⏱️ Work Hours per Day (for reference)", value=8.0, min_value=1.0)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        optimistic = st.number_input("Optimistic Labor/Hour (O)", min_value=0.0, step=0.1)
-        median = st.number_input("Median Labor/Hour", min_value=0.0, step=0.1)
-        trimmed_mean = st.number_input("Trimmed Mean Labor/Hour", min_value=0.0, step=0.1)
-    with col2:
-        most_likely = st.number_input("Most Likely Labor/Hour (M)", min_value=0.0, step=0.1)
-        mode = st.number_input("Mode Labor/Hour", min_value=0.0, step=0.1)
-        mean = st.number_input("Arithmetic Mean Labor/Hour", min_value=0.0, step=0.1)
+    st.markdown("### 📊 Production per Labor per Day (units)")
+    prod_pert = st.number_input("PERT Estimate", min_value=0.0, step=0.1)
+    prod_median = st.number_input("Median Estimate", min_value=0.0, step=0.1)
+    prod_mode = st.number_input("Mode Estimate", min_value=0.0, step=0.1)
+    prod_trimmed_mean = st.number_input("Trimmed Mean Estimate", min_value=0.0, step=0.1)
+    prod_mean = st.number_input("Arithmetic Mean Estimate", min_value=0.0, step=0.1)
 
-    pessimistic = st.number_input("Pessimistic Labor/Hour (P)", min_value=0.0, step=0.1)
+    st.markdown("### 🎯 Target Completion")
+    target_duration = st.number_input("🎯 Target Duration to Finish (days)", min_value=0.0, step=0.5)
 
-    st.markdown("---")
-    work_quantity = st.number_input("Total Work Quantity (units)", min_value=0.0, step=0.1)
-    labor_per_day = st.number_input("Available Laborers per Day", min_value=1)
-    hours_per_day = st.number_input("Work Hours per Day", value=8, min_value=1)
+    submitted = st.form_submit_button("✅ Estimate")
 
-    target_duration = st.number_input("Target Duration to Finish (Days)", min_value=0.0, step=0.1)
-
-    submitted = st.form_submit_button("Calculate")
-
-# === Helper Function to Estimate Duration ===
-def estimate_duration(labor_per_hour, labor_available, work_hours, quantity):
-    labor_day = labor_per_hour * work_hours
-    daily_output = labor_available / labor_day if labor_day else 0
-    duration = quantity / daily_output if daily_output else 0
-    return round(labor_day, 2), round(daily_output, 2), round(duration, 2)
-
-# === Helper to Calculate Required Labor to Finish in Target Duration ===
-def required_labor_for_duration(labor_per_hour, work_hours, quantity, target_days):
-    if labor_per_hour == 0 or work_hours == 0 or target_days == 0:
-        return 0.0
-    labor_needed = (labor_per_hour * work_hours * quantity) / target_days
-    return round(labor_needed, 2)
-
-# === Calculations and Output ===
+# === Results ===
 if submitted:
-    results = []
-    required_labor_results = []
+    st.header("📈 Results")
+    estimates = {
+        "PERT": prod_pert,
+        "Median": prod_median,
+        "Mode": prod_mode,
+        "Trimmed Mean": prod_trimmed_mean,
+        "Arithmetic Mean": prod_mean
+    }
 
-    # PERT Estimate
-    pert_labor_hour = round((optimistic + 4 * most_likely + pessimistic) / 6, 2)
-    pert_day, pert_output, pert_duration = estimate_duration(pert_labor_hour, labor_per_day, hours_per_day, work_quantity)
-    results.append(["PERT", pert_labor_hour, pert_day, pert_duration])
-    required_labor_results.append(["PERT", required_labor_for_duration(pert_labor_hour, hours_per_day, work_quantity, target_duration)])
+    for label, prod_rate in estimates.items():
+        if prod_rate > 0:
+            daily_output, duration = estimate_duration_by_productivity(prod_rate, labor_available, quantity)
+            required_labor = required_labor_for_target(prod_rate, quantity, target_duration) if target_duration > 0 else None
 
-    # Other Estimates
-    if median > 0:
-        m_day, m_output, m_duration = estimate_duration(median, labor_per_day, hours_per_day, work_quantity)
-        results.append(["Median", median, m_day, m_duration])
-        required_labor_results.append(["Median", required_labor_for_duration(median, hours_per_day, work_quantity, target_duration)])
-    if mode > 0:
-        mo_day, mo_output, mo_duration = estimate_duration(mode, labor_per_day, hours_per_day, work_quantity)
-        results.append(["Mode", mode, mo_day, mo_duration])
-        required_labor_results.append(["Mode", required_labor_for_duration(mode, hours_per_day, work_quantity, target_duration)])
-    if trimmed_mean > 0:
-        tm_day, tm_output, tm_duration = estimate_duration(trimmed_mean, labor_per_day, hours_per_day, work_quantity)
-        results.append(["Trimmed Mean", trimmed_mean, tm_day, tm_duration])
-        required_labor_results.append(["Trimmed Mean", required_labor_for_duration(trimmed_mean, hours_per_day, work_quantity, target_duration)])
-    if mean > 0:
-        a_day, a_output, a_duration = estimate_duration(mean, labor_per_day, hours_per_day, work_quantity)
-        results.append(["Arithmetic Mean", mean, a_day, a_duration])
-        required_labor_results.append(["Arithmetic Mean", required_labor_for_duration(mean, hours_per_day, work_quantity, target_duration)])
-
-    df = pd.DataFrame(results, columns=["Method", "Labor/Hour", "Labor/Day", "Estimated Duration (Days)"])
-    df_req = pd.DataFrame(required_labor_results, columns=["Method", "Required Labor to Finish in Target Duration"])
-
-    st.success(f"Estimation Results for Activity: **{activity_name or 'Unnamed'}**")
-    st.subheader("Duration Estimates")
-    st.dataframe(df, use_container_width=True)
-
-    if target_duration > 0:
-        st.subheader(f"Labor Needed to Finish in {target_duration} Days")
-        st.dataframe(df_req, use_container_width=True)
+            st.subheader(f"📘 {label} Estimate")
+            st.write(f"🔹 **Daily Output:** {daily_output} units/day")
+            st.write(f"📅 **Estimated Duration:** {duration} days")
+            if required_labor:
+                st.write(f"👷 **Labor Needed to Finish in {target_duration} days:** {required_labor}")
